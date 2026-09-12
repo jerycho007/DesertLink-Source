@@ -3,5 +3,28 @@
   "version": "1.0.7",
   "description": "Crimson Desert live-map companion using CrimsonDesertTelemetry and DesertLinkCore local IPC",
   "main": "main.js",
-  "private": true
+  "private": true,
+  "author": {
+    "name": "DesertLink"
+  },
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron ."
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^32.0.0"
+  },
+  "keywords": [
+    "electron",
+    "extension-support"
+  ],
+  "extensions": [
+    "app/extensions/fmg"
+  ],
+  "mainScript": {
+    "path": "app/main.js",
+    "enableExtensions": true,
+    "extensionsPath": "app/extensions"
+  }
 }

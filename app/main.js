@@ -1,10 +1,79 @@
-'use strict';
+﻿'use strict';
 
-const { app, BrowserWindow, ipcMain, globalShortcut, shell, dialog, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut, shell, dialog, screen, session } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const net = require('net');
+
+// Extension support configuration for Electron
+const ENABLE_EXTENSIONS = true;
+const EXTENSIONS_PATH = path.join(__dirname, 'extensions');
+let loadedExtensions = [];
+
+/**
+ * Load extensions for Electron app
+ * Uses Electron's native session.loadExtension API and webPreferences.extensions (Electron v30+)
+ */
+async function loadExtensions() {
+  if (!ENABLE_EXTENSIONS) return [];
+
+  try {
+    // Find extension packages in the extensions folder
+    const dirs = fs.readdirSync(EXTENSIONS_PATH);
+    
+    for (const dir of dirs) {
+      const extPath = path.join(EXTENSIONS_PATH, dir);
+      
+      try {
+        if (!fs.statSync(extPath).isDirectory()) continue;
+        
+        // Read extension package.json to get package name and version
+        const manifestPath = path.join(extPath, 'package.json');
+        if (!fs.existsSync(manifestPath)) continue;
+        
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+        const packageName = manifest.name || dir;
+        const version = manifest.version || '0.0.1';
+        
+        console.log(`[Extension] Loading extension: ${packageName}@${version}`);
+        
+        // Create a dedicated session for this extension
+        const session = createSession();
+        
+        try {
+          // Load the extension using session.loadExtension (works on all Electron versions)
+          await session.loadExtension(extPath, () => {
+            console.log(`[Extension] ${packageName}@${version} loaded successfully`);
+          });
+          
+          loadedExtensions.push({ id: packageName, version, path: extPath });
+          console.log(`[Extension] ${packageName}@${version} is ready`);
+        } catch (err) {
+          console.warn(`[Extension] Failed to load ${packageName}:`, err.message);
+          continue;
+        }
+        
+      } catch (err) {
+        console.warn(`[Extension] Skipped ${dir}:`, err.message);
+      }
+    }
+    
+    return loadedExtensions;
+  } catch (err) {
+    console.error('[Extension] Error loading extensions:', err);
+    return [];
+  }
+}
+
+/**
+ * Create and configure a new Session for extension loading
+ */
+function createSession() {
+  return session.fromPartition('persist:desertlink');
+}
+
+// Remove the fake Session class since we now use Electron's actual session
 
 const APP_NAME = 'DesertLink – Crimson Desert Companion';
 const MAP_URL = 'https://mapgenie.io/crimson-desert/maps/pywel';
@@ -30,7 +99,7 @@ let coreConnected = false;
 let coreBuffer = '';
 let coreReconnectTimer = null;
 let quitting = false;
-let lastBackendStatus = { attached: false, hookInstalled: false, physicsReady: false, supportedBuild: false, hookMode: 'none', message: 'Waiting for DesertLinkCore.asi…' };
+let lastBackendStatus = { attached: false, hookInstalled: false, physicsReady: false, supportedBuild: false, hookMode: 'none', message: 'Waiting for DesertLinkCore.asiâ€¦' };
 let lastTelemetryHealth = null;
 let lastSnapshot = null;
 let lastPosition = null;
@@ -524,6 +593,19 @@ function createWindow() {
   win.on('show', broadcastState);
   win.on('hide', broadcastState);
   win.on('close', () => { if (settings.windowMode === 'app') saveAppBounds(); });
+  
+  // Load extensions in the window session
+  const winSession = createSession();
+  try {
+    winSession.loadExtension(path.join(EXTENSIONS_PATH, 'fmg'), () => {
+      console.log('[Extension] fmg loaded for this window');
+    }).then(() => {
+      loadedExtensions.push({ id: 'fmg', version: '3.0.10', path: path.join(EXTENSIONS_PATH, 'fmg') });
+    });
+  } catch (err) {
+    console.warn('[Extension] Failed to load fmg:', err.message);
+  }
+  
   win.loadURL(MAP_URL);
   win.once('ready-to-show', () => { if (win && !win.isDestroyed()) win.show(); });
 }
@@ -570,6 +652,10 @@ app.whenReady().then(async () => {
   app.setName(APP_NAME);
   log('DesertLink starting');
   loadPersistence();
+  
+  // Load extensions before creating window
+  await loadExtensions();
+  
   createWindow();
   registerHotkeys();
   startBackend();

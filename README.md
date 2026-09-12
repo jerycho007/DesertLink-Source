@@ -7,13 +7,16 @@ This repository is published primarily for transparency, security review, and Ne
 ## Components
 
 ### DesertLink desktop app
-Electron-based map companion UI.
+Electron-based map companion UI with extension support.
 
 Source:
 - `app/main.js`
 - `app/preload.js`
 - `app/inject.js`
 - `app/package.json`
+
+**Extension Support:**
+Extensions are loaded automatically from the `app/extensions/` folder when the app starts. Each extension should contain a valid `package.json` manifest file to define its name, version, and capabilities. Extensions use Electron's native session API to run in an isolated context.
 
 ### DesertLinkCore.asi
 Game-side Crimson Desert teleport bridge.
