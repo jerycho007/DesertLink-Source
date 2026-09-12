@@ -594,16 +594,18 @@ function createWindow() {
   win.on('hide', broadcastState);
   win.on('close', () => { if (settings.windowMode === 'app') saveAppBounds(); });
   
-  // Load extensions in the window session
+  // Load extensions in the window session BEFORE page load
   const winSession = createSession();
   try {
     winSession.loadExtension(path.join(EXTENSIONS_PATH, 'fmg'), () => {
       console.log('[Extension] fmg loaded for this window');
     }).then(() => {
       loadedExtensions.push({ id: 'fmg', version: '3.0.10', path: path.join(EXTENSIONS_PATH, 'fmg') });
+    }).catch(err => {
+      console.warn('[Extension] Failed to load fmg for window:', err.message);
     });
   } catch (err) {
-    console.warn('[Extension] Failed to load fmg:', err.message);
+    console.warn('[Extension] Sync error loading fmg:', err.message);
   }
   
   win.loadURL(MAP_URL);
